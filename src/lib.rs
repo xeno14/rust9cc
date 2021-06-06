@@ -1,6 +1,10 @@
-use std::iter::Peekable;
+use std::{convert::TryFrom, iter::Peekable};
 
 use anyhow::{anyhow, Context, Result};
+
+
+const BASE10: u32 = 10;
+
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenKind {
@@ -12,6 +16,25 @@ pub enum TokenKind {
     LParen,
     RParen,
     Eof,
+}
+
+impl TryFrom<char> for TokenKind {
+    type Error = anyhow::Error;
+
+    fn try_from(c: char) -> Result<Self, Self::Error> {
+        let kind = match c {
+            '+' => TokenKind::Plus,
+            '-' => TokenKind::Minus,
+            '*' => TokenKind::Mul,
+            '/' => TokenKind::Div,
+            '(' => TokenKind::LParen,
+            ')' => TokenKind::RParen,
+            _ => {
+                return Err(anyhow!(format!("")));
+            },
+        };
+        Ok(kind)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -26,7 +49,7 @@ where
 {
     let mut buf: Vec<String> = Vec::new();
     while let Some(c) = stream.peek() {
-        if !c.is_digit(10) {
+        if !c.is_digit(BASE10) {
             break;
         }
         buf.push(c.to_string());
@@ -46,55 +69,15 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
             continue;
         }
 
-        if peek == '+' {
-            tokens.push(Token {
-                kind: TokenKind::Plus,
-            });
+        // TokenKind from char.
+        if let Ok(kind) = TokenKind::try_from(peek) {
+            tokens.push(Token {kind});
             stream.next();
             continue;
+
         }
 
-        if peek == '-' {
-            tokens.push(Token {
-                kind: TokenKind::Minus,
-            });
-            stream.next();
-            continue;
-        }
-
-        if peek == '*' {
-            tokens.push(Token {
-                kind: TokenKind::Mul,
-            });
-            stream.next();
-            continue;
-        }
-
-        if peek == '/' {
-            tokens.push(Token {
-                kind: TokenKind::Div,
-            });
-            stream.next();
-            continue;
-        }
-
-        if peek == '(' {
-            tokens.push(Token {
-                kind: TokenKind::LParen,
-            });
-            stream.next();
-            continue;
-        }
-
-        if peek == ')' {
-            tokens.push(Token {
-                kind: TokenKind::RParen,
-            });
-            stream.next();
-            continue;
-        }
-
-        if peek.is_digit(10) {
+        if peek.is_digit(BASE10) {
             let num: u64 = strtolu(&mut stream)?;
             tokens.push(Token {
                 kind: TokenKind::Num(num),
