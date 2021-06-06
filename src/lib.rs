@@ -328,8 +328,17 @@ mod tests {
     #[test]
     fn test_tokenize() -> Result<()> {
         assert_eq!(
-            tokenize("  1+23 - 456")?,
+            tokenize("  2 * (1+23) - 456 / 7")?,
             vec![
+                Token {
+                    kind: TokenKind::Num(2)
+                },
+                Token {
+                    kind: TokenKind::Mul
+                },
+                Token {
+                    kind: TokenKind::LParen
+                },
                 Token {
                     kind: TokenKind::Num(1)
                 },
@@ -340,10 +349,19 @@ mod tests {
                     kind: TokenKind::Num(23)
                 },
                 Token {
+                    kind: TokenKind::RParen
+                },
+                Token {
                     kind: TokenKind::Minus
                 },
                 Token {
                     kind: TokenKind::Num(456)
+                },
+                Token {
+                    kind: TokenKind::Div
+                },
+                Token {
+                    kind: TokenKind::Num(7)
                 },
                 Token {
                     kind: TokenKind::Eof
