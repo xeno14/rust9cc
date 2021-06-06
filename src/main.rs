@@ -1,4 +1,4 @@
-use std::{env, iter::Peekable};
+use std::env;
 
 use rust9cc::*;
 
@@ -10,7 +10,11 @@ fn main() {
 
     let input = args.get(1).unwrap();
     let tokens = tokenize(input).unwrap();
-    let mut tokens = tokens.into_iter().peekable();
+    // eprintln!("{:?}", tokens);
+    // compile(&mut tokens.into_iter().peekable()).unwrap();
+    let tokens = &mut tokens.into_iter().peekable();
+    let root = parse_into_ast(tokens).unwrap();
+    // eprintln!("{:?}", root);
 
-    println!("  ret");
+    gen(&root).unwrap();
 }
