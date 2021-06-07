@@ -331,6 +331,54 @@ fn gen_main(node: &Node) -> Result<()> {
     Ok(())
 }
 
+struct Counter {
+    count: u64
+}
+
+impl Counter {
+    fn new() -> Self {
+        Counter{ count: 0 }
+    }
+
+    fn peek(&self) -> u64 {
+        self.count
+    }
+}
+
+impl Iterator for Counter {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let count: u64 = self.count;
+        self.count += 1;
+        Some(count)
+    }
+}
+
+fn do_dot(node: &Node, counter: &mut Counter) {
+    let node_id: u64 = counter.next().unwrap();
+
+    // Print this node.
+    println!("{}[label=\"{:?}\"];", node_id, node.kind);
+
+    // Print children.
+    if let Some(lhs) = node.lhs.as_ref() {
+        println!("{} -> {};", node_id, counter.peek());
+        do_dot(lhs, counter);
+    }
+    if let Some(rhs) = node.rhs.as_ref() {
+        println!("{} -> {};", node_id, counter.peek());
+        do_dot(rhs, counter);
+    }
+}
+
+pub fn dotify_ast(root: &Node) {
+    println!("digraph G {{");
+    let mut counter = Counter::new();
+    do_dot(root, &mut counter);
+    println!("}}");
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;

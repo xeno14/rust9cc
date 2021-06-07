@@ -37,7 +37,7 @@ fn main() {
     let root = parse_into_ast(tokens).unwrap();
 
     if mode == MODE_AST {
-        println!("{:?}", root);
+        dotify_ast(&root);
         return;
     }
 
