@@ -52,8 +52,9 @@ impl<'a> Iterator for InputReader<'a> {
         if self.reader.len() == 0 {
             return None;
         }
+        let res = self.peek();
         self.advance(1).unwrap();
-        self.peek()
+        res
     }
 }
 
@@ -241,8 +242,9 @@ where
             node = Node::new(NodeKind::Mul, node.make_ref(), primary(tokens)?.make_ref());
         } else if consume(TokenKind::Div, tokens) {
             node = Node::new(NodeKind::Div, node.make_ref(), primary(tokens)?.make_ref());
+        } else {
+            break;
         }
-        break;
     }
     return Ok(node);
 }
@@ -332,15 +334,15 @@ fn gen_main(node: &Node) -> Result<()> {
 }
 
 struct Counter {
-    count: u64
+    count: u64,
 }
 
 impl Counter {
     fn new() -> Self {
-        Counter{ count: 0 }
+        Counter { count: 0 }
     }
 
-    fn peek(&self) -> u64 {
+    fn get(&self) -> u64 {
         self.count
     }
 }
@@ -363,11 +365,11 @@ fn do_dot(node: &Node, counter: &mut Counter) {
 
     // Print children.
     if let Some(lhs) = node.lhs.as_ref() {
-        println!("{} -> {};", node_id, counter.peek());
+        println!("{} -> {};", node_id, counter.get());
         do_dot(lhs, counter);
     }
     if let Some(rhs) = node.rhs.as_ref() {
-        println!("{} -> {};", node_id, counter.peek());
+        println!("{} -> {};", node_id, counter.get());
         do_dot(rhs, counter);
     }
 }
@@ -394,9 +396,9 @@ mod tests {
         let num = reader.consume_number()?;
         assert_eq!(num, 123);
 
-        let peek =reader.peek().context("Not peekable")?;
+        let peek = reader.peek().context("Not peekable")?;
         assert_eq!(peek, 'a');
-        
+
         reader.advance(1)?;
         let peek = reader.peek().context("Not peekable")?;
         assert_eq!(peek, 'b');
@@ -406,6 +408,23 @@ mod tests {
 
     #[test]
     fn test_tokenize() -> Result<()> {
+        assert_eq!(
+            tokenize("(2)")?,
+            vec![
+                Token {
+                    kind: TokenKind::LParen
+                },
+                Token {
+                    kind: TokenKind::Num(2)
+                },
+                Token {
+                    kind: TokenKind::RParen
+                },
+                Token {
+                    kind: TokenKind::Eof
+                },
+            ]
+        );
         assert_eq!(
             tokenize("  2 * (1+23) - 456 / 7")?,
             vec![
