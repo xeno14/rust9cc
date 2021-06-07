@@ -27,6 +27,14 @@ impl Node {
         Self { kind, lhs, rhs }
     }
 
+    pub fn new_num(num: u64) -> Node {
+        Self {
+            kind: NodeKind::Num(num),
+            lhs: None,
+            rhs: None,
+        }
+    }
+
     pub fn make_ref(self) -> Option<NodeRef> {
         Some(Box::new(self))
     }
@@ -50,22 +58,41 @@ where
     return Ok(node);
 }
 
-/// mul     = primary ("*" primary | "/" primary)*
+/// mul     = unary ("*" unary | "/" unary)*
 fn mul<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
 where
     Tokens: Iterator<Item = Token>,
 {
-    let mut node = primary(tokens)?;
+    let mut node = unary(tokens)?;
     loop {
         if consume(TokenKind::Mul, tokens) {
-            node = Node::new(NodeKind::Mul, node.make_ref(), primary(tokens)?.make_ref());
+            node = Node::new(NodeKind::Mul, node.make_ref(), unary(tokens)?.make_ref());
         } else if consume(TokenKind::Div, tokens) {
-            node = Node::new(NodeKind::Div, node.make_ref(), primary(tokens)?.make_ref());
+            node = Node::new(NodeKind::Div, node.make_ref(), unary(tokens)?.make_ref());
         } else {
             break;
         }
     }
     return Ok(node);
+}
+
+/// unary = ("+" | "-")? primary
+fn unary<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
+where
+    Tokens: Iterator<Item = Token>,
+{
+    if consume(TokenKind::Plus, tokens) {
+        primary(tokens)
+    } else if consume(TokenKind::Minus, tokens) {
+        let node = Node::new(
+            NodeKind::Sub,
+            Node::new_num(0).make_ref(),
+            primary(tokens)?.make_ref(),
+        );
+        Ok(node)
+    } else {
+        primary(tokens)
+    }
 }
 
 /// primary = num | "(" expr ")"
@@ -79,7 +106,7 @@ where
         node
     } else {
         let num = expect_number(tokens)?;
-        Node::new(NodeKind::Num(num), Option::None, Option::None)
+        Node::new_num(num)
     };
     Ok(node)
 }
