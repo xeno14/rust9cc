@@ -22,25 +22,6 @@ pub enum TokenKind {
     Eof,
 }
 
-impl TryFrom<char> for TokenKind {
-    type Error = anyhow::Error;
-
-    fn try_from(c: char) -> Result<Self, Self::Error> {
-        let kind = match c {
-            '+' => TokenKind::Plus,
-            '-' => TokenKind::Minus,
-            '*' => TokenKind::Mul,
-            '/' => TokenKind::Div,
-            '(' => TokenKind::LParen,
-            ')' => TokenKind::RParen,
-            _ => {
-                return Err(anyhow!(format!("")));
-            }
-        };
-        Ok(kind)
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
