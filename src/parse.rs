@@ -10,6 +10,12 @@ pub enum NodeKind {
     Sub,
     Mul,
     Div,
+    Eq,
+    Neq,
+    Lt,
+    Leq,
+    Gt,
+    Geq,
     Num(u64),
 }
 
@@ -40,8 +46,74 @@ impl Node {
     }
 }
 
-/// expr    = mul ("+" mul | "-" mul)*
+/// expr    = equality
 fn expr<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
+where
+    Tokens: Iterator<Item = Token>,
+{
+    let mut node = equality(tokens)?;
+    loop {
+        if consume(TokenKind::Plus, tokens) {
+            node = Node::new(NodeKind::Add, node.make_ref(), equality(tokens)?.make_ref());
+        } else if consume(TokenKind::Minus, tokens) {
+            node = Node::new(NodeKind::Sub, node.make_ref(), equality(tokens)?.make_ref());
+        } else {
+            break;
+        }
+    }
+    Ok(node)
+}
+
+/// equality   = relational ("==" relational | "!=" relational)*
+fn equality<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
+where
+    Tokens: Iterator<Item = Token>,
+{
+    let mut node = relational(tokens)?;
+    loop {
+        if consume(TokenKind::Eq, tokens) {
+            node = Node::new(
+                NodeKind::Eq,
+                node.make_ref(),
+                relational(tokens)?.make_ref(),
+            );
+        } else if consume(TokenKind::Neq, tokens) {
+            node = Node::new(
+                NodeKind::Neq,
+                node.make_ref(),
+                relational(tokens)?.make_ref(),
+            );
+        } else {
+            break;
+        }
+    }
+    Ok(node)
+}
+
+/// relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+fn relational<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
+where
+    Tokens: Iterator<Item = Token>,
+{
+    let mut node = add(tokens)?;
+    loop {
+        if consume(TokenKind::Lt, tokens) {
+            node = Node::new(NodeKind::Lt, node.make_ref(), add(tokens)?.make_ref());
+        } else if consume(TokenKind::Leq, tokens) {
+            node = Node::new(NodeKind::Leq, node.make_ref(), add(tokens)?.make_ref());
+        } else if consume(TokenKind::Gt, tokens) {
+            node = Node::new(NodeKind::Gt, node.make_ref(), add(tokens)?.make_ref());
+        } else if consume(TokenKind::Geq, tokens) {
+            node = Node::new(NodeKind::Geq, node.make_ref(), add(tokens)?.make_ref());
+        } else {
+            break;
+        }
+    }
+    Ok(node)
+}
+
+/// add        = mul ("+" mul | "-" mul)*
+fn add<Tokens>(tokens: &mut Peekable<Tokens>) -> Result<Node>
 where
     Tokens: Iterator<Item = Token>,
 {
