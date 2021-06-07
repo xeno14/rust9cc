@@ -11,8 +11,14 @@ pub enum TokenKind {
     Minus,
     Mul,
     Div,
-    LParen,
-    RParen,
+    LParen, // (
+    RParen, // )
+    Eq,     // ==
+    Neq,    // !=
+    Lt,     // <
+    Leq,    // <=
+    Gt,     // >
+    Geq,    // >=
     Eof,
 }
 
@@ -71,7 +77,7 @@ impl<'a> InputReader<'a> {
         self.reader.starts_with(pat)
     }
 
-    fn advance(&mut self, n: usize) -> Result<()> {
+    pub fn advance(&mut self, n: usize) -> Result<()> {
         let (_, reader) = self.reader.split_at(n);
         self.reader = reader;
         Ok(())
@@ -94,9 +100,12 @@ impl<'a> InputReader<'a> {
         self.reader.chars().nth(0)
     }
 
-    fn head(&self, n: usize) -> &str {
+    fn head(&self, n: usize) -> Option<&str> {
+        if self.reader.len() < n {
+            return None;
+        }
         let (head, _) = self.reader.split_at(n);
-        head
+        Some(head)
     }
 }
 
@@ -111,12 +120,36 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
             continue;
         }
 
-        // TokenKind from char.
-        let peek: char = reader.peek().context("Expect a charctor.")?;
-        if let Ok(kind) = TokenKind::try_from(peek) {
-            tokens.push(Token { kind });
-            reader.next().unwrap();
-            continue;
+        if let Some(head) = reader.head(2) {
+            if let Some(kind) = match head {
+                "==" => Some(TokenKind::Eq),
+                "!=" => Some(TokenKind::Neq),
+                "<=" => Some(TokenKind::Leq),
+                ">=" => Some(TokenKind::Geq),
+                _ => None,
+            } {
+                tokens.push(Token { kind });
+                reader.advance(2)?;
+                continue;
+            }
+        }
+
+        if let Some(head) = reader.head(1) {
+            if let Some(kind) = match head {
+                "+" => Some(TokenKind::Plus),
+                "-" => Some(TokenKind::Minus),
+                "*" => Some(TokenKind::Mul),
+                "/" => Some(TokenKind::Div),
+                "(" => Some(TokenKind::LParen),
+                ")" => Some(TokenKind::RParen),
+                "<" => Some(TokenKind::Lt),
+                ">" => Some(TokenKind::Gt),
+                _ => None,
+            } {
+                tokens.push(Token { kind });
+                reader.advance(1)?;
+                continue;
+            }
         }
 
         if let Ok(num) = reader.consume_number() {
@@ -126,7 +159,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
             continue;
         }
 
-        return Err(anyhow!(format!("Unexpected char {}", peek)));
+        return Err(anyhow!(format!("Unable to tokenize {:?}", reader.peek())));
     }
     tokens.push(Token {
         kind: TokenKind::Eof,
@@ -191,7 +224,10 @@ mod tests {
         let mut reader = InputReader::new("123abc");
 
         let head = reader.head(4);
-        assert_eq!(head, "123a");
+        assert_eq!(head.unwrap(), "123a");
+
+        let head = reader.head(10);
+        assert_eq!(head.is_none(), true);
 
         let num = reader.consume_number()?;
         assert_eq!(num, 123);
@@ -208,6 +244,7 @@ mod tests {
 
     #[test]
     fn test_tokenize() -> Result<()> {
+        tokenize("(-1+2)*3")?;
         assert_eq!(
             tokenize("(2)")?,
             vec![
@@ -260,6 +297,33 @@ mod tests {
                 },
                 Token {
                     kind: TokenKind::Num(7)
+                },
+                Token {
+                    kind: TokenKind::Eof
+                },
+            ]
+        );
+
+        assert_eq!(
+            tokenize("== != <= >= < >")?,
+            vec![
+                Token {
+                    kind: TokenKind::Eq
+                },
+                Token {
+                    kind: TokenKind::Neq
+                },
+                Token {
+                    kind: TokenKind::Leq
+                },
+                Token {
+                    kind: TokenKind::Geq
+                },
+                Token {
+                    kind: TokenKind::Lt
+                },
+                Token {
+                    kind: TokenKind::Gt
                 },
                 Token {
                     kind: TokenKind::Eof
