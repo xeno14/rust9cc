@@ -1,5 +1,8 @@
 use clap::{App, Arg};
-use rust9cc::*;
+use rust9cc::gen;
+use rust9cc::parse::parse_into_ast;
+use rust9cc::dot::dotify_ast;
+use rust9cc::token::tokenize;
 
 const MODE_AST: &str = "ast";
 const MODE_TOKEN: &str = "token";
@@ -12,7 +15,7 @@ fn main() {
             Arg::with_name("mode")
                 .long("mode")
                 .possible_values(&[MODE_AST, MODE_TOKEN, MODE_X86])
-                .default_value(MODE_X86)
+                .default_value(MODE_X86),
         )
         .arg(
             Arg::with_name("INPUT")
@@ -24,7 +27,7 @@ fn main() {
 
     let input = matches.value_of("INPUT").unwrap();
     let tokens = tokenize(input).unwrap();
-    
+
     let mode = matches.value_of("mode").unwrap();
     if mode == MODE_TOKEN {
         for token in tokens.iter() {
