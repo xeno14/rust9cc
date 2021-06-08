@@ -1,8 +1,15 @@
-use std::{convert::TryFrom, iter::Peekable};
+use std::iter::Peekable;
 
 use anyhow::{anyhow, Context, Result};
 
 const BASE10: u32 = 10;
+
+/// Represents location in a file (line, column).
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Loc {
+    line: usize,
+    col: usize,
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenKind {
@@ -25,11 +32,12 @@ pub enum TokenKind {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
-    // TODO: info
+    pub loc: Loc,
 }
 
 struct InputReader<'a> {
     reader: &'a str,
+    pub loc: Loc,
 }
 
 impl<'a> Iterator for InputReader<'a> {
@@ -47,7 +55,10 @@ impl<'a> Iterator for InputReader<'a> {
 
 impl<'a> InputReader<'a> {
     fn new(input: &'a str) -> Self {
-        InputReader { reader: input }
+        InputReader {
+            reader: input,
+            loc: Loc { line: 0, col: 0 },
+        }
     }
 
     fn len(&self) -> usize {
@@ -59,8 +70,19 @@ impl<'a> InputReader<'a> {
     }
 
     pub fn advance(&mut self, n: usize) -> Result<()> {
-        let (_, reader) = self.reader.split_at(n);
-        self.reader = reader;
+        let (head, tail) = self.reader.split_at(n);
+        self.reader = tail;
+        self.loc = if head.contains("\n") {
+            Loc {
+                col: 0,
+                line: self.loc.line + 1,
+            }
+        } else {
+            Loc {
+                col: self.loc.col + 1,
+                line: self.loc.line,
+            }
+        };
         Ok(())
     }
 
@@ -100,6 +122,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
             reader.advance(1)?;
             continue;
         }
+        let loc = reader.loc;
 
         if let Some(head) = reader.head(2) {
             if let Some(kind) = match head {
@@ -109,7 +132,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
                 ">=" => Some(TokenKind::Geq),
                 _ => None,
             } {
-                tokens.push(Token { kind });
+                tokens.push(Token { kind, loc });
                 reader.advance(2)?;
                 continue;
             }
@@ -127,7 +150,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
                 ">" => Some(TokenKind::Gt),
                 _ => None,
             } {
-                tokens.push(Token { kind });
+                tokens.push(Token { kind, loc });
                 reader.advance(1)?;
                 continue;
             }
@@ -136,15 +159,18 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
         if let Ok(num) = reader.consume_number() {
             tokens.push(Token {
                 kind: TokenKind::Num(num),
+                loc,
             });
             continue;
         }
 
         return Err(anyhow!(format!("Unable to tokenize {:?}", reader.peek())));
     }
-    tokens.push(Token {
+    let token = Token {
         kind: TokenKind::Eof,
-    });
+        loc: reader.loc,
+    };
+    tokens.push(token);
 
     Ok(tokens)
 }
@@ -206,12 +232,14 @@ mod tests {
 
         let head = reader.head(4);
         assert_eq!(head.unwrap(), "123a");
+        assert_eq!(reader.loc, Loc { line: 0, col: 0 });
 
         let head = reader.head(10);
         assert_eq!(head.is_none(), true);
 
         let num = reader.consume_number()?;
         assert_eq!(num, 123);
+        assert_eq!(reader.loc, Loc { line: 0, col: 3 });
 
         let peek = reader.peek().context("Not peekable")?;
         assert_eq!(peek, 'a');
@@ -224,22 +252,52 @@ mod tests {
     }
 
     #[test]
+    fn test_multiline_reader() -> Result<()> {
+        let input = vec!["a", "bc"].join("\n");
+        let mut reader = InputReader::new(input.as_str());
+
+        reader.advance(1)?;
+        assert_eq!(reader.loc, Loc{line: 0, col: 1});
+
+        reader.advance(1)?;
+        assert_eq!(reader.peek().context("Not peekable")?, 'b');
+        assert_eq!(reader.loc, Loc{line: 1, col: 0});
+
+        Ok(())
+    }
+
+    /// Remove loc from a given tokens.
+    fn remove_loc(tokens: Vec<Token>) -> Vec<Token> {
+        tokens
+            .into_iter()
+            .map(|x| Token {
+                kind: x.kind,
+                loc: Loc { col: 0, line: 0 },
+            })
+            .collect()
+    }
+
+    #[test]
     fn test_tokenize() -> Result<()> {
-        tokenize("(-1+2)*3")?;
+        let loc = Loc { line: 0, col: 0 };
         assert_eq!(
             tokenize("(2)")?,
             vec![
                 Token {
-                    kind: TokenKind::LParen
+                    kind: TokenKind::LParen,
+                    loc: Loc { line: 0, col: 0 },
                 },
                 Token {
-                    kind: TokenKind::Num(2)
+                    kind: TokenKind::Num(2),
+                    loc: Loc { line: 0, col: 1 },
                 },
                 Token {
-                    kind: TokenKind::RParen
+                    kind: TokenKind::RParen,
+                    loc: Loc { line: 0, col: 2 },
                 },
                 Token {
-                    kind: TokenKind::Eof
+                    kind: TokenKind::Eof,
+                    loc: Loc { line: 0, col: 3 },
                 },
             ]
         );
@@ -247,67 +305,86 @@ mod tests {
             tokenize("  2 * (1+23) - 456 / 7")?,
             vec![
                 Token {
-                    kind: TokenKind::Num(2)
+                    kind: TokenKind::Num(2),
+                    loc: Loc { line: 0, col: 2 },
                 },
                 Token {
-                    kind: TokenKind::Mul
+                    kind: TokenKind::Mul,
+                    loc: Loc { line: 0, col: 4 },
                 },
                 Token {
-                    kind: TokenKind::LParen
+                    kind: TokenKind::LParen,
+                    loc: Loc { line: 0, col: 6 },
                 },
                 Token {
-                    kind: TokenKind::Num(1)
+                    kind: TokenKind::Num(1),
+                    loc: Loc { line: 0, col: 7 },
                 },
                 Token {
-                    kind: TokenKind::Plus
+                    kind: TokenKind::Plus,
+                    loc: Loc { line: 0, col: 8 },
                 },
                 Token {
-                    kind: TokenKind::Num(23)
+                    kind: TokenKind::Num(23),
+                    loc: Loc { line: 0, col: 9 },
                 },
                 Token {
-                    kind: TokenKind::RParen
+                    kind: TokenKind::RParen,
+                    loc: Loc { line: 0, col: 11 },
                 },
                 Token {
-                    kind: TokenKind::Minus
+                    kind: TokenKind::Minus,
+                    loc: Loc { line: 0, col: 13 },
                 },
                 Token {
-                    kind: TokenKind::Num(456)
+                    kind: TokenKind::Num(456),
+                    loc: Loc { line: 0, col: 15 },
                 },
                 Token {
-                    kind: TokenKind::Div
+                    kind: TokenKind::Div,
+                    loc: Loc { line: 0, col: 19 },
                 },
                 Token {
-                    kind: TokenKind::Num(7)
+                    kind: TokenKind::Num(7),
+                    loc: Loc { line: 0, col: 21 },
                 },
                 Token {
-                    kind: TokenKind::Eof
+                    kind: TokenKind::Eof,
+                    loc: Loc { line: 0, col: 22 },
                 },
             ]
         );
 
         assert_eq!(
-            tokenize("== != <= >= < >")?,
+            remove_loc(tokenize("== != <= >= < >")?),
             vec![
                 Token {
-                    kind: TokenKind::Eq
+                    kind: TokenKind::Eq,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Neq
+                    kind: TokenKind::Neq,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Leq
+                    kind: TokenKind::Leq,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Geq
+                    kind: TokenKind::Geq,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Lt
+                    kind: TokenKind::Lt,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Gt
+                    kind: TokenKind::Gt,
+                    loc
                 },
                 Token {
-                    kind: TokenKind::Eof
+                    kind: TokenKind::Eof,
+                    loc
                 },
             ]
         );
