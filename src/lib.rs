@@ -1,10 +1,20 @@
-pub mod token;
 pub mod dot;
 pub mod parse;
+pub mod token;
 
 use self::parse::*;
 
 use anyhow::{anyhow, Context, Result};
+use thiserror::Error;
+use token::Loc;
+
+#[derive(Error, Debug)]
+pub enum CompileError {
+    #[error("unable to tokenize '{0}'")]
+    Tokenize(String, Loc),
+    #[error("unknown error")]
+    Unknown,
+}
 
 pub fn gen(node: &Node) -> Result<()> {
     println!(".intel_syntax noprefix");
@@ -59,4 +69,12 @@ fn gen_main(node: &Node) -> Result<()> {
     println!("  push rax");
 
     Ok(())
+}
+
+pub fn display_compile_error(source: &str, loc: Loc, message: &str) {
+    let line = *source.split("\n").skip(loc.line).peekable().peek().unwrap();
+    println!("Compile error at line {}", loc.line);
+    println!("{}", line);
+    let spaces = ' '.to_string().repeat(loc.col);
+    println!("{}^ {}", spaces, message);
 }

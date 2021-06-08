@@ -1,7 +1,12 @@
+use std::process::exit;
+
 use clap::{App, Arg};
+use rust9cc::CompileError;
+use rust9cc::display_compile_error;
 use rust9cc::gen;
 use rust9cc::parse::parse_into_ast;
 use rust9cc::dot::dotify_ast;
+use rust9cc::token::Token;
 use rust9cc::token::tokenize;
 
 const MODE_AST: &str = "ast";
@@ -26,7 +31,19 @@ fn main() {
         .get_matches();
 
     let input = matches.value_of("INPUT").unwrap();
-    let tokens = tokenize(input).unwrap();
+    let tokens = match tokenize(input) {
+        Ok(tokens) => tokens,
+        Err(err) => match err.downcast_ref::<CompileError>() {
+            Some(CompileError::Tokenize(_, loc)) => {
+                display_compile_error(input, *loc, err.to_string().as_str());
+                exit(1);
+            },
+            _ => {
+                println!("{}", err);
+                exit(1);
+            }
+        }
+    };
 
     let mode = matches.value_of("mode").unwrap();
     if mode == MODE_TOKEN {

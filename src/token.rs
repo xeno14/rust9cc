@@ -2,13 +2,15 @@ use std::iter::Peekable;
 
 use anyhow::{anyhow, Context, Result};
 
+use crate::CompileError;
+
 const BASE10: u32 = 10;
 
 /// Represents location in a file (line, column).
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Loc {
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -164,7 +166,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>> {
             continue;
         }
 
-        return Err(anyhow!(format!("Unable to tokenize {:?}", reader.peek())));
+        return Err(CompileError::Tokenize(
+            reader.peek().unwrap().to_string(),
+            loc,
+        ))?;
     }
     let token = Token {
         kind: TokenKind::Eof,
@@ -257,11 +262,11 @@ mod tests {
         let mut reader = InputReader::new(input.as_str());
 
         reader.advance(1)?;
-        assert_eq!(reader.loc, Loc{line: 0, col: 1});
+        assert_eq!(reader.loc, Loc { line: 0, col: 1 });
 
         reader.advance(1)?;
         assert_eq!(reader.peek().context("Not peekable")?, 'b');
-        assert_eq!(reader.loc, Loc{line: 1, col: 0});
+        assert_eq!(reader.loc, Loc { line: 1, col: 0 });
 
         Ok(())
     }
